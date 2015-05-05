@@ -5,7 +5,7 @@ This script is a helper script for Viper ([Viper.li](http://viper.li) available 
 ### What is this repository for? ###
 
 * This script is to create stix files based on your viper API
-* 0.03
+* 0.05
 * [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
 
 ### Usage ###
