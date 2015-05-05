@@ -1,0 +1,31 @@
+Viper2stix 0.5 (2015-05-05)
+===========================
+- adding lot more details to the header
+- adding some more options in the config file
+- changed the TLP ussage
+
+
+Viper2stix 0.4 (2015-04-16)
+===========================
+- bugfixing
+- added Sha256, sha512, sha1 to stix file
+
+Viper2stix 0.3 (2015-04-16)
+===========================
+- added some exception handling
+- pydoc for methods
+- export to file
+- error messages if imports are missing
+
+
+Viper2stix 0.2 (2015-04-15)
+===========================
+- added test api
+- added download of hashes
+- added argparse
+
+
+Viper2stix 0.1 (2015-04-15)
+===========================
+
+Initial release.

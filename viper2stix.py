@@ -8,20 +8,23 @@ Description: Build a STIX Document with Viper API Information
 
 description = 'Create Stix files based on Viper Malware repository API'
 authors = ['deralexxx']
-version = '0.4'
+version = '0.5'
 # stdlib
 from pprint import pprint
 try:
     # python-cybox
     from cybox.common import ToolInformationList, ToolInformation
     from cybox.objects.file_object import File
+    from cybox.common import Time
     from cybox.common import Hash
     # python-stix
     from stix.core import STIXPackage, STIXHeader
     from stix.common import InformationSource
+    from stix.common import Identity 
     from stix.indicator import Indicator
     from stix.extensions.marking.tlp import TLPMarkingStructure
     from stix.data_marking import Marking, MarkingSpecification
+
     HAVE_STIX = True
 except ImportError:
     HAVE_STIX = False    
@@ -35,8 +38,7 @@ except ImportError:
 import requests
 import argparse
 import logging
-
-
+from datetime import datetime
 # Config parser
 import ConfigParser
 
@@ -66,6 +68,15 @@ user=Config.get('viper','user')
 password=Config.get('viper','password')
 usehtaccess=Config.getboolean('viper','usehtaccess')
 
+from stix.utils import set_id_namespace
+NAMESPACE = {Config.get('stix','namespace_url') : Config.get('stix','namespace_name')}
+set_id_namespace(NAMESPACE) 
+
+from cybox.utils import set_id_namespace, Namespace
+NAMESPACE = Namespace(Config.get('stix','namespace_url'), Config.get('stix','namespace_name'))
+set_id_namespace(NAMESPACE) 
+
+
 def stix(json):
     """
     Created a stix file based on a json file that is being handed over
@@ -86,11 +97,28 @@ def stix(json):
     # stix.common.ToolInformation.
     tool = ToolInformation(
         tool_name="viper2stix",
-        tool_vendor="The Viper group http://viper.li - developed by Alexander Jaeger"
+        tool_vendor="The Viper group http://viper.li - developed by Alexander Jaeger https://github.com/deralexxx/viper2stix"
     )
+        
+    #Adding your identity to the header
+    identity = Identity()
+    identity.name = Config.get('stix', 'producer_name')
+    stix_header.information_source.identity=identity
+    
 
+    # Set the Information Source "tools" section to a
+    # cybox.common.ToolInformationList which contains our tool that we
+    # created above.
+    stix_header.information_source.tools = ToolInformationList(tool)
+
+    stix_header.title = Config.get('stix', 'title')
+    # Set the produced time to now
+    stix_header.information_source.time = Time()
+    stix_header.information_source.time.produced_time = datetime.now()
+    
+    
     marking_specification = MarkingSpecification()
-    marking_specification.controlled_structure = "//node() | //@*"
+    marking_specification.controlled_structure = "../../../descendant-or-self::node()"
     tlp = TLPMarkingStructure()
     tlp.color = Config.get('stix', 'TLP')
     marking_specification.marking_structures.append(tlp)
@@ -99,13 +127,10 @@ def stix(json):
     handling.add_marking(marking_specification)
     
 
-    # Set the Information Source "tools" section to a
-    # cybox.common.ToolInformationList which contains our tool that we
-    # created above.
-    stix_header.information_source.tools = ToolInformationList(tool)
+  
 
     # Set the header description
-    stix_header.description = "Extract of a file from a Viper instance"
+    stix_header.description =  Config.get('stix', 'description')
 
     # Set the STIXPackage header
     stix_package.stix_header = stix_header
@@ -144,15 +169,16 @@ def stix(json):
                 sha512.simple_hash_value = sha512_value   
                 h = Hash(sha512, Hash.TYPE_SHA512)
                 f.add_hash(h)
-            
-            #h = HashList.from_list([{'type' : 'MD5', 'simple_hash_value' : 'FFFFFF'},
-            #            {'type' : 'SHA1', 'simple_hash_value' : 'FFFFFF'}])
+
             f.add_hash(item['md5'])
+            
+            #adding the md5 hash to the title as well
+            stix_header.title+=' '+item['md5']
             #print(item['type'])
             f.size_in_bytes=item['size']
             f.file_format=item['type']
             f.file_name = item['name']
-            
+            indicator.description = "File hash served by a Viper instance"
             indicator.add_object(f)
             stix_package.add_indicator(indicator)
     except Exception, e:
@@ -181,19 +207,22 @@ def get_data(url,data):
 
     #print data
     try:
-        proxy_handler = urllib2.ProxyHandler({})
-        logger.debug("a")
+        proxy_url = ""
+        proxy_support = urllib2.ProxyHandler({'http': proxy_url})
+        opener = urllib2.build_opener(proxy_support)
+        urllib2.install_opener(opener)
+        #src = urllib2.urlopen(url)
         opener = urllib2.build_opener(proxy_handler)
-        logger.debug("b")
         if data != None:
             data = urllib.urlencode(data)
-        request = urllib2.Request(url,data=data)
+        request = urllib2.Request(url,data=data,proxies={})
         if usehtaccess:
             base64string = base64.encodestring('%s:%s' % (user,password)).replace('\n', '')
             request.add_header("Authorization", "Basic %s" % base64string)   
         logger.debug(request)
         response = opener.open(request)
-        
+        logger.debug(response)
+
         return response
     except Exception, e:
             logger.error('Error: %s',format(e))
@@ -291,8 +320,7 @@ if __name__ == '__main__':
     parser.add_argument("-l", "--latest", help="list of latest files", default=None, action="store", dest="latest", required=False)
     parser.add_argument("-sa", "--all", help="search all (be careful!)", default=None, action="store_true", dest="search_all", required=False)
     parser.add_argument("-n", "--name", help="search by name", default=None, action="store", dest="search_name", required=False)
-    
-    
+   
     if not HAVE_STIX:
         logger.error("Missing dependency, install stix (`pip install stix`)")
         quit()        
@@ -324,8 +352,9 @@ if __name__ == '__main__':
                 if args.export_filename:
                     logger.debug("print to file %s",args.export_filename)
                     writeFile(args.export_filename, stix_result.to_xml())
-                else:    
+           
                     # TODO. Check if stix result was correct this means there is a stix result
-                    print (stix_result.to_xml())
+                    print(stix_result.to_xml())
+    
             except Exception, e:
                 logger.error('Error: %s',format(e))

@@ -1,0 +1,4 @@
+stix
+ConfigParser
+argparse
+requests
