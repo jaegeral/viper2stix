@@ -8,7 +8,7 @@ Description: Build a STIX Document with Viper API Information
 
 description = 'Create Stix files based on Viper Malware repository API'
 authors = ['deralexxx']
-version = '0.5'
+version = '0.6'
 # stdlib
 from pprint import pprint
 try:
@@ -211,11 +211,11 @@ def get_data(url,data):
         proxy_support = urllib2.ProxyHandler({'http': proxy_url})
         opener = urllib2.build_opener(proxy_support)
         urllib2.install_opener(opener)
-        #src = urllib2.urlopen(url)
-        opener = urllib2.build_opener(proxy_handler)
+        
+                #encode the data and the url
         if data != None:
             data = urllib.urlencode(data)
-        request = urllib2.Request(url,data=data,proxies={})
+        request = urllib2.Request(url,data=data)
         if usehtaccess:
             base64string = base64.encodestring('%s:%s' % (user,password)).replace('\n', '')
             request.add_header("Authorization", "Basic %s" % base64string)   
